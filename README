@@ -5,7 +5,6 @@ Pure Data external for generating or decoding ltc audio timecode
 
 Allows to sync to a DAW or sync two Pd instances via audio connection - and therefore having the same latency as your audio stream.
 
-
 using libltc library by Robin Gareus.
 based on Max object by Mattijs Kneppers
 
@@ -13,15 +12,16 @@ www.matthiaskronlachner.com
 
 (C) 2013 by Matthias Kronlachner
 
-This version 0.2 is a forked from Matthias Kronlachner flext external
+____________________________________________
+
+version 0.2 : 2022 by Jean-Yves Gratius
+
+This version 0.2 is a fork from Matthias Kronlachner flext external
 It uses pdlibbuilder Helper makefile for Pure Data external libraries. https://github.com/pure-data/pd-lib-builder
-
-v 0.2 2022 by Jean-Yves Gratius
-
 __________________________________________________________
 
 ::INSTALL::
-
+make
 _______________
 :::CHANGELOG:::
 
