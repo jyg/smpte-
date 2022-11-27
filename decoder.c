@@ -2,7 +2,7 @@
    libltc - en+decode linear timecode
 
    Copyright (C) 2005 Maarten de Boer <mdeboer@iua.upf.es>
-   Copyright (C) 2006-2012 Robin Gareus <robin@gareus.org>
+   Copyright (C) 2006-2022 Robin Gareus <robin@gareus.org>
    Copyright (C) 2008-2009 Jan <jan@geheimwerk.de>
 
    Binary constant generator macro for endianess conversion
@@ -101,13 +101,24 @@
 	printf("\n"); \
 }
 
+#if (defined _MSC_VER && _MSC_VER <= 1800)
+#define inline __inline
+#endif
+
+#if (!defined INFINITY && defined _MSC_VER)
+#define INFINITY std::numeric_limits<double>::infinity()
+#endif
+#if (!defined INFINITY && defined HUGE_VAL)
+#define INFINITY HUGE_VAL
+#endif
+
 static double calc_volume_db(LTCDecoder *d) {
 	if (d->snd_to_biphase_max <= d->snd_to_biphase_min)
 		return -INFINITY;
 	return (20.0 * log10((d->snd_to_biphase_max - d->snd_to_biphase_min) / 255.0));
 }
 
-static void parse_ltc(LTCDecoder *d, unsigned char bit, int offset, ltc_off_t posinfo) {
+static void parse_ltc(LTCDecoder *d, unsigned char bit, ltc_off_t offset, ltc_off_t posinfo) {
 	int bit_num, bit_set, byte_num;
 
 	if (d->bit_cnt == 0) {
@@ -169,6 +180,10 @@ static void parse_ltc(LTCDecoder *d, unsigned char bit, int offset, ltc_off_t po
 		if (d->bit_cnt == LTC_FRAME_BIT_COUNT) {
 			int bc;
 
+			if (d->queue_write_off == d->queue_len) {
+				d->queue_write_off = 0;
+			}
+
 			memcpy( &d->queue[d->queue_write_off].ltc,
 				&d->ltc_frame,
 				sizeof(LTCFrame));
@@ -187,8 +202,6 @@ static void parse_ltc(LTCDecoder *d, unsigned char bit, int offset, ltc_off_t po
 
 			d->queue_write_off++;
 
-			if (d->queue_write_off == d->queue_len)
-				d->queue_write_off = 0;
 		}
 		d->bit_cnt = 0;
 	}
@@ -223,6 +236,10 @@ static void parse_ltc(LTCDecoder *d, unsigned char bit, int offset, ltc_off_t po
 				((unsigned char*)&d->ltc_frame)[byte_num_max-1-k] = bi;
 			}
 
+			if (d->queue_write_off == d->queue_len) {
+				d->queue_write_off = 0;
+			}
+
 			memcpy( &d->queue[d->queue_write_off].ltc,
 				&d->ltc_frame,
 				sizeof(LTCFrame));
@@ -240,15 +257,12 @@ static void parse_ltc(LTCDecoder *d, unsigned char bit, int offset, ltc_off_t po
 			d->queue[d->queue_write_off].sample_max = d->snd_to_biphase_max;
 
 			d->queue_write_off++;
-
-			if (d->queue_write_off == d->queue_len)
-				d->queue_write_off = 0;
 		}
 		d->bit_cnt = 0;
 	}
 }
 
-static __inline void biphase_decode2(LTCDecoder *d, int offset, ltc_off_t pos) {
+static inline void biphase_decode2(LTCDecoder *d, ltc_off_t offset, ltc_off_t pos) {
 
 	d->biphase_tics[d->biphase_tic] = d->snd_to_biphase_period;
 	d->biphase_tic = (d->biphase_tic + 1) % LTC_FRAME_BIT_COUNT;

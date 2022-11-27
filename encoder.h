@@ -1,7 +1,7 @@
 /*
    libltc - en+decode linear timecode
 
-   Copyright (C) 2006-2012 Robin Gareus <robin@gareus.org>
+   Copyright (C) 2006-2022 Robin Gareus <robin@gareus.org>
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU Lesser General Public License as
@@ -45,3 +45,4 @@ struct LTCEncoder {
 };
 
 int encode_byte(LTCEncoder *e, int byte, double speed);
+int encode_transition(LTCEncoder *e);

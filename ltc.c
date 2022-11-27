@@ -1,7 +1,7 @@
 /*
    libltc - en+decode linear timecode
 
-   Copyright (C) 2006-2015 Robin Gareus <robin@gareus.org>
+   Copyright (C) 2006-2022 Robin Gareus <robin@gareus.org>
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU Lesser General Public License as
@@ -27,7 +27,7 @@
 #include "decoder.h"
 #include "encoder.h"
 
-#if (defined _MSVC_VER && _MSVC_VER < 1800)
+#if (defined _MSC_VER && _MSC_VER < 1800) || (defined __AVR__)
 static double rint(double v) {
 	// NB. this is identical to round(), not rint(), but the difference is not relevant here
 	return floor(v + 0.5);
@@ -41,6 +41,10 @@ static double rint(double v) {
 LTCDecoder* ltc_decoder_create(int apv, int queue_len) {
 	LTCDecoder* d = (LTCDecoder*) calloc(1, sizeof(LTCDecoder));
 	if (!d) return NULL;
+
+	if (queue_len < 1) {
+		queue_len = 1;
+	}
 
 	d->queue_len = queue_len;
 	d->queue = (LTCFrameExt*) calloc(d->queue_len, sizeof(LTCFrameExt));
@@ -90,8 +94,9 @@ void ltc_decoder_write_ ## FN (LTCDecoder *d, FORMAT *buf, size_t size, ltc_off_
 	} \
 }
 
-LTCWRITE_TEMPLATE(float, float, 128 + (buf[copyStart+i] * 127.0))
-/* this relies on the compiler to use an arithemtic right-shift for signed values */
+LTCWRITE_TEMPLATE(double, double, 128 + (buf[copyStart+i] * 127.0))
+LTCWRITE_TEMPLATE(float, float, 128 + (buf[copyStart+i] * 127.f))
+/* this relies on the compiler to use an arithmetic right-shift for signed values */
 LTCWRITE_TEMPLATE(s16, short, 128 + (buf[copyStart+i] >> 8))
 /* this relies on the compiler to use a logical right-shift for unsigned values */
 LTCWRITE_TEMPLATE(u16, unsigned short, (buf[copyStart+i] >> 8))
@@ -101,21 +106,18 @@ LTCWRITE_TEMPLATE(u16, unsigned short, (buf[copyStart+i] >> 8))
 int ltc_decoder_read(LTCDecoder* d, LTCFrameExt* frame) {
 	if (!frame) return -1;
 	if (d->queue_read_off != d->queue_write_off) {
+		if (d->queue_read_off == d->queue_len) {
+			d->queue_read_off = 0;
+		}
 		memcpy(frame, &d->queue[d->queue_read_off], sizeof(LTCFrameExt));
 		d->queue_read_off++;
-		if (d->queue_read_off == d->queue_len)
-			d->queue_read_off = 0;
 		return 1;
 	}
 	return 0;
 }
 
 void ltc_decoder_queue_flush(LTCDecoder* d) {
-	while (d->queue_read_off != d->queue_write_off) {
-		d->queue_read_off++;
-		if (d->queue_read_off == d->queue_len)
-			d->queue_read_off = 0;
-	}
+	d->queue_read_off = d->queue_write_off;
 }
 
 int ltc_decoder_queue_length(LTCDecoder* d) {
@@ -211,6 +213,11 @@ void ltc_encoder_reset(LTCEncoder *e) {
 	e->offset = 0;
 }
 
+double ltc_encoder_get_volume(LTCEncoder *e) {
+    ltcsnd_sample_t diff = (e->enc_hi - e->enc_lo) / 2;
+    return 20.0 * log10((double)diff / 127.0);
+}
+
 int ltc_encoder_set_volume(LTCEncoder *e, double dBFS) {
 	if (dBFS > 0)
 		return -1;
@@ -221,6 +228,12 @@ int ltc_encoder_set_volume(LTCEncoder *e, double dBFS) {
 	e->enc_lo = SAMPLE_CENTER - diff;
 	e->enc_hi = SAMPLE_CENTER + diff;
 	return 0;
+}
+
+double ltc_encoder_get_filter(LTCEncoder *e) {
+    const double num = -2000000.0 * exp(1.0);
+    const double den = e->sample_rate * log(1.0 - e->filter_const);
+    return num / den;
 }
 
 void ltc_encoder_set_filter(LTCEncoder *e, double rise_time) {
@@ -238,7 +251,7 @@ void ltc_encoder_set_filter(LTCEncoder *e, double rise_time) {
 		e->filter_const = 1.0 - exp( -1.0 / (e->sample_rate * rise_time / 2000000.0 / exp(1.0)) );
 }
 
-int ltc_encoder_set_bufsize(LTCEncoder *e, double sample_rate, double fps) {
+int ltc_encoder_set_buffersize(LTCEncoder *e, double sample_rate, double fps) {
 	free (e->buf);
 	e->offset = 0;
 	e->bufsize = 1 + ceil(sample_rate / fps);
@@ -249,8 +262,16 @@ int ltc_encoder_set_bufsize(LTCEncoder *e, double sample_rate, double fps) {
 	return 0;
 }
 
+int ltc_encoder_set_bufsize(LTCEncoder *e, double sample_rate, double fps) {
+	return ltc_encoder_set_buffersize(e, sample_rate, fps);
+}
+
 int ltc_encoder_encode_byte(LTCEncoder *e, int byte, double speed) {
 	return encode_byte(e, byte, speed);
+}
+
+int ltc_encoder_end_encode(LTCEncoder *e) {
+	return encode_transition(e);
 }
 
 void ltc_encoder_encode_frame(LTCEncoder *e) {
@@ -260,12 +281,58 @@ void ltc_encoder_encode_frame(LTCEncoder *e) {
 	}
 }
 
+void ltc_encoder_encode_reversed_frame(LTCEncoder *e) {
+	int byte;
+	for (byte = 9 ; byte >= 0 ; --byte) {
+		encode_byte(e, byte, -1.0);
+	}
+}
+
 void ltc_encoder_get_timecode(LTCEncoder *e, SMPTETimecode *t) {
 	ltc_frame_to_time(t, &e->f, e->flags);
 }
 
 void ltc_encoder_set_timecode(LTCEncoder *e, SMPTETimecode *t) {
 	ltc_time_to_frame(&e->f, t, e->standard, e->flags);
+}
+
+void ltc_encoder_set_user_bits(LTCEncoder *e, unsigned long data){
+	LTCFrame *f = &(e->f);
+	f->user1 = data & 0xF;
+	data >>= 4;
+	f->user2 = data & 0xF;
+	data >>= 4;
+	f->user3 = data & 0xF;
+	data >>= 4;
+	f->user4 = data & 0xF;
+	data >>= 4;
+	f->user5 = data & 0xF;
+	data >>= 4;
+	f->user6 = data & 0xF;
+	data >>= 4;
+	f->user7 = data & 0xF;
+	data >>= 4;
+	f->user8 = data & 0xF;
+}
+
+unsigned long ltc_frame_get_user_bits(LTCFrame *f){
+	unsigned long data = 0;
+	data += f->user8;
+	data <<= 4;
+	data += f->user7;
+	data <<= 4;
+	data += f->user6;
+	data <<= 4;
+	data += f->user5;
+	data <<= 4;
+	data += f->user4;
+	data <<= 4;
+	data += f->user3;
+	data <<= 4;
+	data += f->user2;
+	data <<= 4;
+	data += f->user1;
+	return data;
 }
 
 void ltc_encoder_get_frame(LTCEncoder *e, LTCFrame *f) {
@@ -292,17 +359,28 @@ void ltc_encoder_buffer_flush(LTCEncoder *e) {
 	e->offset = 0;
 }
 
+int ltc_encoder_get_bufferptr(LTCEncoder *e, ltcsnd_sample_t **buf, int flush) {
+	const int len = e->offset;
+	if (buf) *buf = e->buf;
+	if (flush) e->offset = 0;
+	return len;
+}
+
 ltcsnd_sample_t *ltc_encoder_get_bufptr(LTCEncoder *e, int *size, int flush) {
 	if (size) *size = e->offset;
 	if (flush) e->offset = 0;
 	return e->buf;
 }
 
-int ltc_encoder_get_buffer(LTCEncoder *e, ltcsnd_sample_t *buf) {
+int ltc_encoder_copy_buffer(LTCEncoder *e, ltcsnd_sample_t *buf) {
 	const int len = e->offset;
 	memcpy(buf, e->buf, len * sizeof(ltcsnd_sample_t) );
 	e->offset = 0;
-	return(len);
+	return len;
+}
+
+int ltc_encoder_get_buffer(LTCEncoder *e, ltcsnd_sample_t *buf) {
+	return ltc_encoder_copy_buffer(e, buf);
 }
 
 void ltc_frame_set_parity(LTCFrame *frame, enum LTC_TV_STANDARD standard) {

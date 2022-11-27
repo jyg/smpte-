@@ -1,7 +1,7 @@
 /*
    libltc - en+decode linear timecode
 
-   Copyright (C) 2006-2012 Robin Gareus <robin@gareus.org>
+   Copyright (C) 2006-2022 Robin Gareus <robin@gareus.org>
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU Lesser General Public License as
@@ -103,6 +103,24 @@ int encode_byte(LTCEncoder *e, int byte, double speed) {
 		else
 			b <<= 1;
 	} while (b);
+
+	return err;
+}
+
+int encode_transition(LTCEncoder *e) {
+	if (e->offset + 1 >= e->bufsize) {
+		return -1;
+	}
+
+	int off = e->offset;
+
+	int n = e->bufsize - e->offset - 1;
+	e->state = !e->state;
+	int err = addvalues(e, n);
+
+	if (e->filter_const <= 0) {
+		e->offset = off + 1;
+	}
 
 	return err;
 }

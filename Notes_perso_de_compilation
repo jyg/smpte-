@@ -1,0 +1,8 @@
+make system=Windows pdbinpath="/home/jyg/Desktop/Documents/Pd/pd-0.53-0.msw/bin/" pdincludepath="/home/jyg/Desktop/Documents/Pd/pd-0.53-0.msw/src/" CXX=x86_64-w64-mingw32-g++ 
+ne fonctionne pas
+
+
+Par contre 
+
+make system=Windows pdbinpath="/home/jyg/Desktop/Documents/Pd/pd-0.53-0.msw/bin/" pdincludepath="/home/jyg/Desktop/Documents/Pd/pd-0.53-0.msw/src/" CC=x86_64-w64-mingw32-gcc CXX=x86_64-w64-mingw32-g++ 
+ a marché

@@ -152,8 +152,10 @@ static t_int *smpte_tilde_perform(t_int *w)
  				outlet_list(x->outlet2, &s_list,4,timecode_list);
                 
                 ltc_encoder_encode_frame(x->encoder);
-                
-                x->smpteBuffer = ltc_encoder_get_bufptr(x->encoder, &x->smpteBufferLength, 1);
+                //ltc_encoder_get_bufptr is deprecated
+               x->smpteBuffer = ltc_encoder_get_bufptr(x->encoder, &x->smpteBufferLength, 1);
+            //   x->smpteBufferLength = ltc_encoder_get_bufferptr(x->encoder, &x->smpteBuffer , 1);
+            // 	post ("len=%d",x->smpteBufferLength);   
                 x->smpteBufferTime = 0;
             }
             
@@ -242,7 +244,9 @@ static void smpte_tilde_set_fps(t_smpte_tilde *x, t_floatarg fvalue)
 			break;
 	}
 	//JYG: Samplerate() remplacé par sys_getsr() cf d_ugen.c pour gestion en tenant compte de block~)
-	ltc_encoder_set_bufsize(x->encoder, sys_getsr(), x->fps);
+	
+	//ltc_encoder_set_bufsize is deprecated
+	ltc_encoder_set_buffersize(x->encoder, sys_getsr(), x->fps);
 	ltc_encoder_reinit(x->encoder, sys_getsr(), x->fps, x->fps == 25 ? LTC_TV_625_50 : LTC_TV_525_60, 0);
     
 }
@@ -275,8 +279,9 @@ static void *smpte_tilde_new(t_symbol *s, int argc, t_atom *argv)
     //startTimeCode = st;
     
     x->encoder = ltc_encoder_create(1, 1, LTC_TV_625_50, 0);
-    
-    ltc_encoder_set_bufsize(x->encoder, sys_getsr(), x->fps);
+   // DEPRECATED 
+  //  ltc_encoder_set_bufsize(x->encoder, sys_getsr(), x->fps);
+    ltc_encoder_set_buffersize(x->encoder, sys_getsr(), x->fps);
     ltc_encoder_reinit(x->encoder, sys_getsr(), x->fps, x->fps == 25 ? LTC_TV_625_50 : LTC_TV_525_60, 0);
     
     ltc_encoder_set_filter(x->encoder, 0);
@@ -328,6 +333,7 @@ void smpte_tilde_setup()
           gensym("time"), A_GIMME, 0);	    
 	class_addmethod(smpte_tilde_class, (t_method)smpte_tilde_set_milliseconds,
           gensym("ms"), A_DEFFLOAT, 0);	
+//    class_sethelpsymbol(smpte_tilde_class, gensym("smpte~-help.pd"));
     
   
     

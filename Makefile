@@ -1,4 +1,4 @@
-# Makefile to build Ableton Link external for Pure Data.
+# Makefile to build SMPTE~ external for Pure Data.
 #
 # Needs Makefile.pdlibbuilder as helper makefile for platform-dependent build
 # settings and rules.
@@ -48,15 +48,15 @@ update-pdlibbuilder:
 
 deken-source:
 	@rm -rf build_src
-	@mkdir -p build_src/abl_link~
-	@cp $(abl_link~.class.sources) \
-		$(patsubst %.cpp, %.hpp, $(abl_link~.class.sources)) \
-		$(datafiles) Makefile.pdlibbuilder metronome.pd Makefile \
-			build_src/abl_link~
-	cd build_src/ ; deken upload -v $(VERSION) abl_link~
+	@mkdir -p build_src/smpte~
+	@cp $(smpte~.class.sources) \
+		$(patsubst %.cpp, %.hpp, $(smpte~.class.sources)) \
+		$(datafiles) Makefile.pdlibbuilder Makefile \
+			build_src/smpte~
+	cd build_src/ ; deken upload -v $(VERSION) smpte~
 
 deken-binary:
 	@rm -rf build
 	@make install objectsdir=./build
-	cd build/ ; deken upload -v $(VERSION) abl_link~
+	cd build/ ; deken upload -v $(VERSION) smpte~
     

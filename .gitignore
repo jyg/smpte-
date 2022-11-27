@@ -10,3 +10,6 @@ captures
 *.so
 *.dylib
 *.pd_darwin
+*.zip
+*.dll
+*.pd_linux
